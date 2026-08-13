@@ -8,6 +8,10 @@ ENV/
 .env
 *.env
 
+# Data Files & Datasets
+data/
+*.csv
+
 # Python / Jupyter artifacts
 __pycache__/
 *.py[cod]
