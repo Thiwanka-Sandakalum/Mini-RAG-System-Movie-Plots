@@ -6,53 +6,49 @@ A lightweight, production-grade Retrieval-Augmented Generation (RAG) system buil
 
 ## 🌟 System Architecture
 
-### 1. Ingestion & Indexing Pipeline (Horizontal Flow)
+### 1. Ingestion & Indexing Pipeline
 
 ```mermaid
-flowchart TD
-    A["Full CSV: wiki_movie_plots_deduped.csv"] --> B["Load with pandas<br/>drop rows missing Title / Plot"]
-    B --> C["Sample 300 movies<br/>seed = 42"]
-    C --> D["Build searchable_text<br/>Title + Cast + Plot"]
-    D --> E["DataFrameLoader<br/>row to LangChain Document"]
-    E --> F["RecursiveCharacterTextSplitter<br/>300 words, 50 word overlap"]
-    F --> G["~640 chunks<br/>+ chunk_id metadata"]
-    G --> H["Embed chunks<br/>gemini-embedding-001<br/>task_type = RETRIEVAL_DOCUMENT"]
-    G --> I["BM25Retriever.from_documents"]
-    H --> J[("FAISS index<br/>dense / semantic")]
-    I --> K[("BM25 index<br/>sparse / keyword")]
+flowchart LR
+    A["📁 1. Data Source<br/>Movie Dataset CSV"] --> B["🧹 2. Data Preprocessing<br/>Load, clean & construct searchable text"]
+    B --> C["✂️ 3. Document Chunking<br/>Recursive text splitting (~300 words + metadata)"]
+    
+    C --> H["🔢 4a. Dense Vector Embedding<br/>gemini-embedding-001"]
+    C --> I["🔤 4b. Sparse Keyword Indexing<br/>BM25 text tokenization"]
+    
+    H --> J[("🗄️ Dense Index<br/>FAISS Vector Store")]
+    I --> K[("🗄️ Sparse Index<br/>BM25 Retriever")]
 
-    classDef store fill:#d1ecf1,stroke:#0c5460,stroke-width:1px
+    classDef stage fill:#eef2ff,stroke:#4f46e5,stroke-width:1.5px
+    classDef store fill:#ecfdf5,stroke:#059669,stroke-width:2px
+
+    class A,B,C,H,I stage
     class J,K store
-
 ```
 
 ---
 
-### 2. RAG Query & Generation Pipeline (Horizontal Flow)
+### 2. RAG Query & Generation Pipeline
 
 ```mermaid
-flowchart TD
-    Q["User question"] --> QA["Query analysis<br/>one structured LLM call"]
-    QA --> D1{"In scope?"}
-    D1 -- "No" --> R1["Return refusal JSON<br/>contexts = empty"]
-    D1 -- "Yes" --> HY{"HyDE enabled?"}
-    HY -- "Yes" --> HP["Generate hypothetical<br/>plot passage"]
-    HY -- "No" --> EMB
-    HP --> EMB["Embed question or HyDE text<br/>task_type = RETRIEVAL_QUERY"]
-    EMB --> DS["Dense search: FAISS<br/>top 15"]
-    EMB --> SS["Sparse search: BM25<br/>top 15"]
-    DS --> RRF["Reciprocal Rank Fusion<br/>merge dense + sparse"]
+flowchart LR
+    Q["👤 User Question"] --> QA["🤖 1. Query Analysis<br/>Scope check & metadata filter extraction"]
+    QA --> HY["💡 2. Query Expansion (HyDE)<br/>Hypothetical passage generation"]
+    
+    HY --> DS["🎯 3a. Dense Search (FAISS)<br/>Top 15 semantic vector matches"]
+    HY --> SS["🔤 3b. Sparse Search (BM25)<br/>Top 15 keyword term matches"]
+    
+    DS --> RRF["🔀 4. Hybrid Fusion (RRF)<br/>Merge dense + sparse rank lists"]
     SS --> RRF
-    RRF --> TOPK["Take top 5 chunks"]
-    TOPK --> GEN["Gemini generates answer<br/>structured output to RAGAnswer"]
-    GEN --> GR["Ground contexts field in<br/>the chunks actually retrieved"]
-    GR --> OUT["Final JSON:<br/>answer, contexts, reasoning"]
+    
+    RRF --> GEN["✨ 5. Gemini Generation & Grounding<br/>Synthesize answer & verify contexts"]
+    GEN --> OUT["📦 6. Final Structured Response<br/>Answer, contexts & reasoning JSON"]
 
-    classDef decision fill:#fff3cd,stroke:#856404,stroke-width:1px
-    classDef terminal fill:#f8d7da,stroke:#721c24,stroke-width:1px
-    class D1,HY,FL,D2 decision
-    class R1,R2 terminal
+    classDef stage fill:#eef2ff,stroke:#4f46e5,stroke-width:1.5px
+    classDef output fill:#ecfdf5,stroke:#059669,stroke-width:2px
 
+    class Q,QA,HY,DS,SS,RRF,GEN stage
+    class OUT output
 ```
 
 ---
@@ -90,8 +86,10 @@ The system outputs a verified JSON payload conforming to the following structure
 ```text
 Team D/
 ├── data/
-│   └── wiki_movie_plots_deduped.csv   # Kaggle Movie Plots dataset
+│   └── wiki_movie_plots_deduped.csv   # Kaggle Movie Plots dataset (downloaded locally)
 ├── rag_movie_plots_langchain.ipynb     # Main RAG notebook implementation
+├── ingestion_pipeline.mermaid          # Ingestion Architecture Diagram
+├── query_pipeline.mermaid              # Query Architecture Diagram
 ├── README.md                           # Project documentation
 ├── requirements.txt                    # Python dependencies
 └── .env                                # Environment config
@@ -111,12 +109,22 @@ Team D/
 Clone the repository and install the dependencies:
 
 ```bash
-git clone <your-repo-url>
-cd Team D
+git clone git@github.com:Thiwanka-Sandakalum/Mini-RAG-System-Movie-Plots.git
+cd Mini-RAG-System-Movie-Plots
 pip install -r requirements.txt
 ```
 
-### 2. Environment Setup
+### 2. Dataset Setup
+
+Download the [Wikipedia Movie Plots](https://www.kaggle.com/datasets/jrobischon/wikipedia-movie-plots) dataset from Kaggle, create the `data/` directory, and place the CSV file inside it named `wiki_movie_plots_deduped.csv`:
+
+```bash
+mkdir -p data
+# Place downloaded CSV in the data/ folder and ensure it is named:
+# data/wiki_movie_plots_deduped.csv
+```
+
+### 3. Environment Setup
 
 Set up your Gemini / Google Cloud environment variables in a `.env` file or terminal session:
 
@@ -129,7 +137,7 @@ export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 export GOOGLE_CLOUD_LOCATION="us-central1"
 ```
 
-### 3. Running the Pipeline
+### 4. Running the Pipeline
 
 Open and run `rag_movie_plots_langchain.ipynb` using Jupyter Notebook or VS Code:
 
